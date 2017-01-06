@@ -21,6 +21,15 @@ pub mod errors {
             ProgramTooLong {
                 description("input program is too long")
             }
+
+            /// There was an error when parsing assembly code.
+            ///
+            /// Contains error description and line number of error.
+            Asm(s: String, n: usize) {
+                description("error parsing assembly")
+                display("error parsing assembly on line {}: {}", n, s)
+            }
+
             /// An IO error.
             Io(s: String) {
                 description("io error")
@@ -32,9 +41,11 @@ pub mod errors {
 
 pub use errors::*;
 
+mod asm;
 mod instruction;
 mod simulator;
 
+pub use asm::Assembler;
 pub use simulator::Simulator;
 
 #[cfg(test)]

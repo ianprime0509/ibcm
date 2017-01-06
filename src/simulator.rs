@@ -20,6 +20,24 @@ pub struct Simulator {
 }
 
 impl Simulator {
+    /// Load the simulator from the given instructions.
+    pub fn from_instructions(input: &[u16]) -> Result<Simulator> {
+        if input.len() > 4096 {
+            return Err(ErrorKind::ProgramTooLong.into());
+        }
+
+        let mut data = [0u16; 4096];
+        data[..input.len()].copy_from_slice(input);
+
+        Ok(Simulator {
+            memory: data,
+            acc: 0,
+            ir: 0,
+            pc: 0,
+            halted: false,
+        })
+    }
+
     /// Load the simulator from the given binary data.
     pub fn from_binary<R: Read>(input: R) -> Result<Simulator> {
         let mut data = [0u16; 4096];

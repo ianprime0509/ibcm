@@ -38,7 +38,7 @@ pub enum Instruction {
 }
 
 impl Instruction {
-    /// Parses an instruction from the given u16 (word)
+    /// Parses an instruction from the given u16 (word).
     pub fn from_u16(word: u16) -> Instruction {
         match word >> 12 {
             0x0 => Instruction::Halt,
@@ -70,6 +70,62 @@ impl Instruction {
             0xE => Instruction::Jmpl(word & 0xfff),
             0xF => Instruction::Brl(word & 0xfff),
             _ => unreachable!(),
+        }
+    }
+
+    /// Returns the value of the current instruction as a u16.
+    pub fn to_u16(&self) -> u16 {
+        match *self {
+            Instruction::Halt => 0x0000,
+            Instruction::Io(IoOp::ReadHex) => 0x1000,
+            Instruction::Io(IoOp::ReadChar) => 0x1400,
+            Instruction::Io(IoOp::WriteHex) => 0x1800,
+            Instruction::Io(IoOp::WriteChar) => 0x1c00,
+            Instruction::Shift(ShiftOp::ShiftLeft, n) => 0x2000 | (n & 0xf),
+            Instruction::Shift(ShiftOp::ShiftRight, n) => 0x2400 | (n & 0xf),
+            Instruction::Shift(ShiftOp::RotateLeft, n) => 0x2800 | (n & 0xf),
+            Instruction::Shift(ShiftOp::RotateRight, n) => 0x2c00 | (n & 0xf),
+            Instruction::Load(addr) => 0x3000 | (addr & 0xfff),
+            Instruction::Store(addr) => 0x4000 | (addr & 0xfff),
+            Instruction::Add(addr) => 0x5000 | (addr & 0xfff),
+            Instruction::Sub(addr) => 0x6000 | (addr & 0xfff),
+            Instruction::And(addr) => 0x7000 | (addr & 0xfff),
+            Instruction::Or(addr) => 0x8000 | (addr & 0xfff),
+            Instruction::Xor(addr) => 0x9000 | (addr & 0xfff),
+            Instruction::Not => 0xa000,
+            Instruction::Nop => 0xb000,
+            Instruction::Jmp(addr) => 0xc000 | (addr & 0xfff),
+            Instruction::Jmpe(addr) => 0xd000 | (addr & 0xfff),
+            Instruction::Jmpl(addr) => 0xe000 | (addr & 0xfff),
+            Instruction::Brl(addr) => 0xf000 | (addr & 0xfff),
+        }
+    }
+
+    /// Returns the name of the current instruction.
+    pub fn name(&self) -> &'static str {
+        match *self {
+            Instruction::Halt => "halt",
+            Instruction::Io(IoOp::ReadHex) => "readH",
+            Instruction::Io(IoOp::ReadChar) => "readC",
+            Instruction::Io(IoOp::WriteHex) => "printH",
+            Instruction::Io(IoOp::WriteChar) => "printC",
+            Instruction::Shift(ShiftOp::ShiftLeft, _) => "shiftL",
+            Instruction::Shift(ShiftOp::ShiftRight, _) => "shiftR",
+            Instruction::Shift(ShiftOp::RotateLeft, _) => "rotL",
+            Instruction::Shift(ShiftOp::RotateRight, _) => "rotR",
+            Instruction::Load(_) => "load",
+            Instruction::Store(_) => "store",
+            Instruction::Add(_) => "add",
+            Instruction::Sub(_) => "sub",
+            Instruction::And(_) => "and",
+            Instruction::Or(_) => "or",
+            Instruction::Xor(_) => "xor",
+            Instruction::Not => "not",
+            Instruction::Nop => "nop",
+            Instruction::Jmp(_) => "jmp",
+            Instruction::Jmpe(_) => "jmpe",
+            Instruction::Jmpl(_) => "jmpl",
+            Instruction::Brl(_) => "brl",
         }
     }
 }
