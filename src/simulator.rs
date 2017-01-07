@@ -1,6 +1,6 @@
 //! The IBCM simulation.
 
-use std::io::{self, Read, Write, BufRead, BufReader};
+use std::io::{self, Read, Write, BufRead, BufReader, BufWriter};
 
 use errors::*;
 use instruction::{Instruction, IoOp, ShiftOp};
@@ -17,6 +17,8 @@ pub struct Simulator {
     pc: u16,
     /// Whether the machine has been halted
     halted: bool,
+    /// The actual length of the program
+    len: usize,
 }
 
 impl Simulator {
@@ -35,6 +37,7 @@ impl Simulator {
             ir: 0,
             pc: 0,
             halted: false,
+            len: input.len(),
         })
     }
 
@@ -42,8 +45,11 @@ impl Simulator {
     pub fn from_binary<R: Read>(input: R) -> Result<Simulator> {
         let mut data = [0u16; 4096];
         let mut i = 0;
-        // Whether we're filling the top half of the byte
-        let mut upper = true;
+        // Whether we're filling the top half of the byte.
+        // This is initially false because we're treating input as
+        // little-endian for compatibility with the reference
+        // implementation.
+        let mut upper = false;
 
         for b in input.bytes() {
             let b = b.chain_err(|| ErrorKind::Io("could not read from binary input".into()))?;
@@ -53,9 +59,9 @@ impl Simulator {
 
             if upper {
                 data[i] |= (b as u16) << 8;
+                i += 1;
             } else {
                 data[i] |= b as u16;
-                i += 1;
             }
             upper = !upper;
         }
@@ -66,6 +72,7 @@ impl Simulator {
             ir: 0,
             pc: 0,
             halted: false,
+            len: i,
         })
     }
 
@@ -84,7 +91,11 @@ impl Simulator {
                 continue;
             }
             // Try to read a word
-            let word = u16::from_str_radix(&l[..4], 16).chain_err(|| ErrorKind::UserInput(format!("expected hexadecimal word at start of line: '{}'", l)))?;
+            let word = u16::from_str_radix(&l[..4], 16).chain_err(|| {
+                    ErrorKind::UserInput(format!("expected hexadecimal word at start of line: \
+                                                  '{}'",
+                                                 l))
+                })?;
             if i >= data.len() {
                 return Err(ErrorKind::ProgramTooLong.into());
             }
@@ -98,7 +109,37 @@ impl Simulator {
             ir: 0,
             pc: 0,
             halted: false,
+            len: i,
         })
+    }
+
+    /// Writes the memory of the simulator in binary format.
+    pub fn to_binary<W: Write>(&self, input: W) -> Result<()> {
+        let mut bw = BufWriter::new(input);
+
+        // Output the binary
+        for &w in &self.memory[..self.len] {
+            // The IBCM is big-endian, but output should be
+            // little-endian for compatibility with the reference
+            // implementation (which does not support big-endian
+            // output).
+            bw.write(&[(w & 0xff) as u8, ((w >> 8) & 0xff) as u8])
+                .chain_err(|| ErrorKind::Io("could not write to file".into()))?;
+        }
+
+        Ok(())
+    }
+
+    /// Writes the memory of the simulator in hexadecimal format.
+    pub fn to_hex<W: Write>(&self, input: W) -> Result<()> {
+        let mut bw = BufWriter::new(input);
+
+        // Output the hex file
+        for w in &self.memory[..self.len] {
+            writeln!(bw, "{:04x}", w).chain_err(|| ErrorKind::Io("could not write to file".into()))?;
+        }
+
+        Ok(())
     }
 
     /// Returns a reference to the memory.
@@ -108,7 +149,8 @@ impl Simulator {
 
     /// Dumps memory in a nice format to stdout.
     pub fn dump(&self, amt: usize) {
-        println!("    |   0|   1|   2|   3|   4|   5|   6|   7|   8|   9|   A|   B|   C|   D|   E|   F");
+        println!("    |   0|   1|   2|   3|   4|   5|   6|   7|   8|   9|   A|   B|   C|   D|   \
+                  E|   F");
         println!("------------------------------------------------------------------------------------");
         let mut row = 0;
         for chunk in self.memory[..amt].chunks(16) {
@@ -240,14 +282,18 @@ fn read_hex() -> Result<u16> {
     io::stdout().flush().expect("could not flush stdout");
 
     let mut input = String::new();
-    io::stdin().read_line(&mut input).chain_err(|| ErrorKind::Io("could not read user input".into()))?;
+    io::stdin().read_line(&mut input)
+        .chain_err(|| ErrorKind::Io("could not read user input".into()))?;
     let hex = input.trim();
-    
+
     // Validate input
     if hex.len() >= 1 && hex.len() <= 4 {
         Ok(u16::from_str_radix(hex, 16).chain_err(|| ErrorKind::UserInput(format!("'{}' is not a valid hexadecimal word", hex)))?)
     } else {
-        Err(ErrorKind::UserInput(format!("'{}' is not a valid hexadecimal word (should be at most 4 hexadecimal digits)", hex)).into())
+        Err(ErrorKind::UserInput(format!("'{}' is not a valid hexadecimal word (should be at \
+                                          most 4 hexadecimal digits)",
+                                         hex))
+            .into())
     }
 }
 
@@ -257,7 +303,8 @@ fn read_u8() -> Result<u8> {
     io::stdout().flush().expect("could not flush stdout");
 
     let mut input = String::new();
-    io::stdin().read_line(&mut input).chain_err(|| ErrorKind::Io("could not read user input".into()))?;
+    io::stdin().read_line(&mut input)
+        .chain_err(|| ErrorKind::Io("could not read user input".into()))?;
     let tr = input.trim();
     let ch = tr.as_bytes();
 

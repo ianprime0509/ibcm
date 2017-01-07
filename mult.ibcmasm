@@ -1,0 +1,110 @@
+// A transcription of the example multiplication program
+	jmp	init
+
+sptr:	dw	0fff
+tmp:	dw	0
+load:	dw	3000
+store:	dw	4000
+jmp:	dw	c000
+zero:	dw	0
+one:	dw	1
+two:	dw	2
+three:	dw	3
+retval:	dw	0
+	
+init:
+	readH
+	store	tmp
+	load	sptr
+	add	store
+	store	pos1
+	load	tmp
+pos1:	nop
+	load	sptr
+	sub	one
+	store	sptr
+	readH
+	store	tmp
+	load	sptr
+	add	store
+	store	pos2
+	load	tmp
+pos2:	nop
+	load	sptr
+	sub	one
+	store	sptr
+	brl	mult	
+	store	tmp	
+	load	sptr	
+	add	two	
+	store	sptr	
+	load	tmp	
+	printH		
+	halt
+mult:	store	tmp	
+	load	sptr	
+	add	store	
+	store	pos3	
+	load	tmp	
+pos3:	nop		
+	load	sptr	
+	sub	one	
+	store	sptr	
+	load	zero	
+	store	retval	
+	load	sptr	
+	add	load	
+	add	three	
+	store	pos4	
+pos4:	nop		
+	store	tmp	
+	jmpe	ret	
+	jmp	recurse	
+ret:	load	sptr	
+	add	load	
+	add	one	
+	store	pos5	
+pos5:	nop		
+	add	jmp	
+	store	pos6	
+	load	sptr	
+	add	one	
+	store	sptr	
+	load	retval	
+pos6:	nop		
+recurse:	load	sptr	
+	add	store	
+	store	pos7	
+	load	tmp	
+	sub	one	
+pos7:	nop		
+	load	sptr	
+	sub	one	
+	store	sptr	
+	load	sptr	
+	add	load	
+	add	three	
+	store	pos8	
+pos8:	nop		
+	store	tmp	
+	load	sptr	
+	add	store	
+	store	pos9	
+	load	tmp	
+pos9:	nop		
+	load	sptr	
+	sub	one	
+	store	sptr	
+	brl	mult	
+	store	tmp	
+	load	sptr	
+	add	load	
+	add	one	
+	store	pos10	
+pos10:	nop		
+	add	tmp	
+	store	retval	
+	load	sptr	
+	add	two	
+	store	sptr	
+	jmp	ret	
