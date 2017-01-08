@@ -1,4 +1,5 @@
 extern crate clap;
+extern crate error_chain;
 
 extern crate ibcm;
 
@@ -9,7 +10,7 @@ use std::process;
 use clap::{Arg, App, ArgMatches, SubCommand};
 
 use ibcm::errors::*;
-use ibcm::{Assembler, Simulator};
+use ibcm::{Assembler, Debugger, Simulator};
 
 fn main() {
     let matches = App::new("IBCM (Itty Bitty Computing Machine)")
@@ -34,6 +35,19 @@ fn main() {
                 .default_value("ibcm.out")
                 .help("Sets the output file name")
                 .takes_value(true)))
+        .subcommand(SubCommand::with_name("debug")
+            .arg(Arg::with_name("INPUT")
+                .help("The program to debug")
+                .required(true))
+            .arg(Arg::with_name("asm")
+                .conflicts_with("binary")
+                .short("s")
+                .long("asm")
+                .help("Processes the input as an ICBM assembly file"))
+            .arg(Arg::with_name("binary")
+                .short("b")
+                .long("binary")
+                .help("Processes the input as a binary file")))
         .subcommand(SubCommand::with_name("execute")
             .arg(Arg::with_name("INPUT")
                 .help("The program data file to load")
@@ -71,6 +85,7 @@ fn main() {
 fn run(m: &ArgMatches) -> Result<()> {
     match m.subcommand() {
         ("compile", Some(sub_m)) => compile(sub_m),
+        ("debug", Some(sub_m)) => debug(sub_m),
         ("execute", Some(sub_m)) => execute(sub_m),
         _ => {
             println!("{}", m.usage());
@@ -98,6 +113,53 @@ fn compile(m: &ArgMatches) -> Result<()> {
         sim.to_binary(of)?;
     } else {
         sim.to_hex(of)?;
+    }
+
+    Ok(())
+}
+
+/// The `debug` subcommand.
+fn debug(m: &ArgMatches) -> Result<()> {
+    // We can unwrap here since INPUT is a required argument
+    let input = m.value_of("INPUT").unwrap();
+    let f = File::open(input).chain_err(|| ErrorKind::Io("could not open input file".into()))?;
+    // Read the input file into a simulator
+    let sim = if m.is_present("binary") {
+        Simulator::from_binary(f)
+    } else if m.is_present("asm") {
+        Simulator::from_instructions(&Assembler::assemble(f)?)
+    } else {
+        Simulator::from_hex(f)
+    }?;
+    let mut debug = Debugger::new(sim);
+
+    // Debug console
+    loop {
+        print!(">> ");
+        io::stdout().flush().expect("could not flush stdout");
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).chain_err(|| ErrorKind::Io("could not read from stdin".into()))?;
+        let input_parts = input.trim().split_whitespace().collect::<Vec<_>>();
+        if input_parts.is_empty() {
+            continue;
+        }
+        let command = input_parts[0];
+        let args = &input_parts[1..];
+
+        match debug.execute_command(command, args) {
+            Ok(true) => break,
+            Ok(false) => continue,
+            Err(e @ Error(ErrorKind::Debug(_), _)) => {
+                println!("error: {}", e);
+
+                for e in e.iter().skip(1) {
+                    println!("caused by: {}", e);
+                }
+                continue;
+            }
+            Err(e) => return Err(e),
+        }
     }
 
     Ok(())

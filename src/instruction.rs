@@ -1,3 +1,5 @@
+use std::fmt;
+
 /// The different I/O operations
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub enum IoOp {
@@ -42,20 +44,25 @@ impl Instruction {
     pub fn from_u16(word: u16) -> Instruction {
         match word >> 12 {
             0x0 => Instruction::Halt,
-            0x1 => Instruction::Io(match (word >> 10) & 0b11 {
-                0 => IoOp::ReadHex,
-                1 => IoOp::ReadChar,
-                2 => IoOp::WriteHex,
-                3 => IoOp::WriteChar,
-                _ => unreachable!(),
-            }),
-            0x2 => Instruction::Shift(match (word >> 10) & 0b11 {
-                0 => ShiftOp::ShiftLeft,
-                1 => ShiftOp::ShiftRight,
-                2 => ShiftOp::RotateLeft,
-                3 => ShiftOp::RotateRight,
-                _ => unreachable!(),
-            }, word & 0xf),
+            0x1 => {
+                Instruction::Io(match (word >> 10) & 0b11 {
+                    0 => IoOp::ReadHex,
+                    1 => IoOp::ReadChar,
+                    2 => IoOp::WriteHex,
+                    3 => IoOp::WriteChar,
+                    _ => unreachable!(),
+                })
+            }
+            0x2 => {
+                Instruction::Shift(match (word >> 10) & 0b11 {
+                                       0 => ShiftOp::ShiftLeft,
+                                       1 => ShiftOp::ShiftRight,
+                                       2 => ShiftOp::RotateLeft,
+                                       3 => ShiftOp::RotateRight,
+                                       _ => unreachable!(),
+                                   },
+                                   word & 0xf)
+            }
             0x3 => Instruction::Load(word & 0xfff),
             0x4 => Instruction::Store(word & 0xfff),
             0x5 => Instruction::Add(word & 0xfff),
@@ -128,5 +135,49 @@ impl Instruction {
             Instruction::Brl(_) => "brl",
         }
     }
+
+    /// Returns the address argument of the current instruction, if any.
+    pub fn address(&self) -> Option<u16> {
+        match *self {
+            Instruction::Load(n) |
+            Instruction::Store(n) |
+            Instruction::Add(n) |
+            Instruction::Sub(n) |
+            Instruction::And(n) |
+            Instruction::Or(n) |
+            Instruction::Xor(n) |
+            Instruction::Jmp(n) |
+            Instruction::Jmpe(n) |
+            Instruction::Jmpl(n) |
+            Instruction::Brl(n) => Some(n),
+            _ => None,
+        }
+    }
+
+    /// Returns whether the current instruction is a control flow construct
+    /// (i.e. a jump or a branch).
+    pub fn is_jmp(&self) -> bool {
+        match *self {
+            Instruction::Jmp(_) |
+            Instruction::Jmpe(_) |
+            Instruction::Jmpl(_) |
+            Instruction::Brl(_) => true,
+            _ => false,
+        }
+    }
 }
 
+impl fmt::Display for Instruction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Instruction::Shift(_, n) => write!(f, "{} {}", self.name(), n),
+            _ => {
+                if let Some(addr) = self.address() {
+                    write!(f, "{} {:04x}", self.name(), addr)
+                } else {
+                    write!(f, "{}", self.name())
+                }
+            }
+        }
+    }
+}

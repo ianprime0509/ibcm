@@ -147,6 +147,29 @@ impl Simulator {
         &self.memory
     }
 
+    /// Returns the instruction at the given position in memory.
+    pub fn instruction_at(&self, addr: u16) -> Instruction {
+        Instruction::from_u16(self.memory[addr as usize])
+    }
+
+    /// Returns the current instruction.
+    pub fn current_instruction(&self) -> Result<Instruction> {
+        if self.pc >= self.memory.len() as u16 {
+            return Err(ErrorKind::OutOfBounds.into());
+        }
+        Ok(self.instruction_at(self.pc))
+    }
+
+    /// Returns the registers: (acc, ir, pc).
+    pub fn regs(&self) -> (i16, u16, u16) {
+        (self.acc, self.ir, self.pc)
+    }
+
+    /// Returns whether the machine has been halted.
+    pub fn is_halted(&self) -> bool {
+        self.halted
+    }
+
     /// Dumps memory in a nice format to stdout.
     pub fn dump(&self, amt: usize) {
         println!("    |   0|   1|   2|   3|   4|   5|   6|   7|   8|   9|   A|   B|   C|   D|   \
@@ -170,14 +193,10 @@ impl Simulator {
     /// halted when this method is called, there will be an error.
     pub fn step(&mut self) -> Result<bool> {
         // Load the instruction and increment the program counter
-        if self.pc >= self.memory.len() as u16 {
-            return Err(ErrorKind::OutOfBounds.into());
-        }
-        self.ir = self.memory[self.pc as usize];
+        let ins = self.current_instruction()?;
         self.pc += 1;
 
-        let ins = self.ir;
-        self.execute(Instruction::from_u16(ins))?;
+        self.execute(ins)?;
         Ok(self.halted)
     }
 

@@ -30,6 +30,15 @@ pub mod errors {
                 display("error parsing assembly on line {}: {}", n, s)
             }
 
+            /// There was an error in the debugger.
+            ///
+            /// Basically just a simple message designated as a debugger
+            /// error for better handling.
+            Debug(s: String) {
+                description("debugger error")
+                display("{}", s)
+            }
+
             /// An IO error.
             Io(s: String) {
                 description("io error")
@@ -42,10 +51,13 @@ pub mod errors {
 pub use errors::*;
 
 mod asm;
+mod debug;
 mod instruction;
 mod simulator;
 
 pub use asm::Assembler;
+pub use debug::Debugger;
+pub use instruction::Instruction;
 pub use simulator::Simulator;
 
 #[cfg(test)]
