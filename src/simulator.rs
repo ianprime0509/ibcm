@@ -172,17 +172,12 @@ impl Simulator {
 
     /// Dumps memory in a nice format to stdout.
     pub fn dump(&self, amt: usize) {
-        println!("    |   0|   1|   2|   3|   4|   5|   6|   7|   8|   9|   A|   B|   C|   D|   \
-                  E|   F");
-        println!("------------------------------------------------------------------------------------");
-        let mut row = 0;
-        for chunk in self.memory[..amt].chunks(16) {
-            print!("  {:02x}", row);
+        for (i, chunk) in (&self.memory[..amt]).chunks(8).enumerate() {
+            print!("{:03x}:", 8*i);
             for w in chunk {
-                print!("|{:04x}", w);
+                print!(" {:04x}", w);
             }
             println!("");
-            row += 1;
         }
     }
 

@@ -2,6 +2,17 @@
 use errors::*;
 use simulator::Simulator;
 
+/// The help string for the debugger
+static HELP: &'static str = "The following commands are recognized:
+quit            Exit the debugger.
+help            Print this message.
+dump <amt>      Display the contents of the first <amt>
+                memory locations.
+run             Run the program until it halts.
+status          Output the content of all registers and print
+                the current instruction.
+step <n>        Execute the next <n> instructions.";
+
 /// A debugger, which is a wrapper around a `Simulator` that
 /// processes debug instructions.
 pub struct Debugger {
@@ -23,6 +34,10 @@ impl Debugger {
     pub fn execute_command(&mut self, command: &str, args: &[&str]) -> Result<bool> {
         match command {
             "quit" => Ok(true),
+            "help" => {
+                println!("{}", HELP);
+                Ok(false)
+            }
             "dump" => self.dump(args),
             "run" => self.run(args),
             "status" => self.status(args),
