@@ -1,6 +1,6 @@
 use std::fmt;
 
-/// The different I/O operations
+/// The different I/O operations.
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub enum IoOp {
     ReadHex,
@@ -9,7 +9,7 @@ pub enum IoOp {
     WriteChar,
 }
 
-/// The different shift operations
+/// The different shift operations.
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub enum ShiftOp {
     ShiftLeft,
@@ -18,24 +18,43 @@ pub enum ShiftOp {
     RotateRight,
 }
 
-/// A single IBCM instruction
+/// A single IBCM instruction.
+///
+/// See the official IBCM documentation for a description
+/// of each operation.
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub enum Instruction {
+    /// `0x0 halt`
     Halt,
+    /// `0x1 i/o` (takes operation)
     Io(IoOp),
+    /// `0x2 shift` (takes operation and amount)
     Shift(ShiftOp, u16),
+    /// `0x3 load` (takes address)
     Load(u16),
+    /// `0x4 store` (takes address)
     Store(u16),
+    /// `0x5 add` (takes address)
     Add(u16),
+    /// `0x6 sub` (takes address)
     Sub(u16),
+    /// `0x7 and` (takes address)
     And(u16),
+    /// `0x8 or` (takes address)
     Or(u16),
+    /// `0x9 xor` (takes address)
     Xor(u16),
+    /// `0xA not`
     Not,
+    /// `0xB nop`
     Nop,
+    /// `0xC jmp` (takes address)
     Jmp(u16),
+    /// `0xD jmpe` (takes address)
     Jmpe(u16),
+    /// `0xE jmpl` (takes address)
     Jmpl(u16),
+    /// `0xF brl` (takes address)
     Brl(u16),
 }
 

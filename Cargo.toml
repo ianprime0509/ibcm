@@ -6,3 +6,8 @@ authors = ["Ian Johnson <ianprime0509@gmail.com>"]
 [dependencies]
 clap = "2.20.0"
 error-chain = "0.7.2"
+
+[[bin]]
+doc = false
+name = "ibcm"
+path = "src/bin/ibcm.rs"

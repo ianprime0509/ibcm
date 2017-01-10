@@ -3,7 +3,7 @@ use errors::*;
 use simulator::Simulator;
 
 /// The help string for the debugger
-static HELP: &'static str = "The following commands are recognized:
+const HELP: &'static str = "The following commands are recognized:
 quit            Exit the debugger.
 help            Print this message.
 dump <amt>      Display the contents of the first <amt>
@@ -15,14 +15,14 @@ step <n>        Execute the next <n> instructions.";
 
 /// A debugger, which is a wrapper around a `Simulator` that
 /// processes debug instructions.
-pub struct Debugger {
+pub struct Debugger<'a, 'b> {
     /// The underlying `Simulator`.
-    sim: Simulator,
+    sim: Simulator<'a, 'b>,
 }
 
-impl Debugger {
+impl<'a, 'b> Debugger<'a, 'b> {
     /// Construct a new `Debugger` from the given `Simulator`.
-    pub fn new(sim: Simulator) -> Debugger {
+    pub fn new(sim: Simulator<'a, 'b>) -> Self {
         Debugger {
             sim: sim,
         }
@@ -52,7 +52,7 @@ impl Debugger {
             return Err(ErrorKind::Debug("must specify amount of memory to dump".into()).into());
         }
         let amt = args[0].parse().chain_err(|| ErrorKind::Debug("invalid amount to dump".into()))?;
-        self.sim.dump(amt);
+        self.sim.dump(amt)?;
 
         Ok(false)
     }

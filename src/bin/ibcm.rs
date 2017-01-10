@@ -102,7 +102,7 @@ fn compile(m: &ArgMatches) -> Result<()> {
     let sim = if m.is_present("hex") {
         Simulator::from_hex(f)
     } else {
-        Simulator::from_instructions(&Assembler::assemble(f)?)
+        Simulator::from_instructions(Assembler::assemble(f)?.data())
     }?;
 
     // Safe because we provided a default value
@@ -127,7 +127,7 @@ fn debug(m: &ArgMatches) -> Result<()> {
     let sim = if m.is_present("binary") {
         Simulator::from_binary(f)
     } else if m.is_present("asm") {
-        Simulator::from_instructions(&Assembler::assemble(f)?)
+        Simulator::from_instructions(Assembler::assemble(f)?.data())
     } else {
         Simulator::from_hex(f)
     }?;
@@ -174,7 +174,7 @@ fn execute(m: &ArgMatches) -> Result<()> {
     let mut sim = if m.is_present("binary") {
         Simulator::from_binary(f)
     } else if m.is_present("asm") {
-        Simulator::from_instructions(&Assembler::assemble(f)?)
+        Simulator::from_instructions(Assembler::assemble(f)?.data())
     } else {
         Simulator::from_hex(f)
     }?;

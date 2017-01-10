@@ -1,4 +1,5 @@
 // A transcription of the example multiplication program
+// (without comments)
 	jmp	init
 
 sptr:	dw	0fff
@@ -72,7 +73,7 @@ pos5:	nop
 	store	sptr	
 	load	retval	
 pos6:	nop		
-recurse:	load	sptr	
+recurse:load	sptr	
 	add	store	
 	store	pos7	
 	load	tmp	
