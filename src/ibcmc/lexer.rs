@@ -15,6 +15,10 @@ pub enum Token {
     Sub,
     /// `=`
     Assign,
+    /// `+=`
+    AddAssign,
+    /// `-=`
+    SubAssign,
     /// `;`
     Semi,
 
@@ -117,8 +121,26 @@ impl<I> Iterator for Lexer<I>
         match self.input.next() {
             Some(Ok(b)) => {
                 Some(Ok(match b {
-                            b'+' => Token::Add,
-                            b'-' => Token::Sub,
+                            b'+' => {
+                                match self.input.next() {
+                                    Some(Ok(b'=')) => Token::AddAssign,
+                                    Some(res) => {
+                                        self.input.put_back(res);
+                                        Token::Add
+                                    }
+                                    None => Token::Add,
+                                }
+                            }
+                            b'-' => {
+                                match self.input.next() {
+                                    Some(Ok(b'=')) => Token::SubAssign,
+                                    Some(res) => {
+                                        self.input.put_back(res);
+                                        Token::Sub
+                                    }
+                                    None => Token::Sub,
+                                }
+                            }
                             b'=' => Token::Assign,
                             b';' => Token::Semi,
                             b'0'...b'9' => {
