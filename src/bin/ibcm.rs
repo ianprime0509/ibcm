@@ -14,6 +14,7 @@ use clap::{Arg, App, ArgMatches, SubCommand};
 use ibcm::errors::*;
 use ibcm::{Assembler, Debugger, Simulator};
 use ibcm::ibcmc::lexer::Lexer;
+use ibcm::ibcmc::parser::Parser;
 
 quick_main!(run);
 
@@ -192,9 +193,8 @@ fn ibcmc(m: &ArgMatches) -> Result<()> {
     let f = File::open(input)
         .chain_err(|| ErrorKind::Io(format!("could not open input file `{}`", input)))?;
 
-    for tok in Lexer::new(f.bytes()) {
-        println!("{:?}", tok?);
-    }
+    let ast = Parser::parse_from_lexer(Lexer::new(f.bytes()))?;
+    println!("{:#?}", ast);
 
     Ok(())
 }

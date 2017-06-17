@@ -1,5 +1,6 @@
 //! The IBCMC lexer.
 
+use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::io::Result as IoResult;
 
 use itertools::{self, PutBack};
@@ -7,7 +8,7 @@ use itertools::{self, PutBack};
 use ibcmc::errors::*;
 
 /// A token.
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq,Eq)]
 pub enum Token {
     /// `+`
     Add,
@@ -23,15 +24,41 @@ pub enum Token {
     Semi,
 
     /// An identifier.
-    Ident(String),
+    Ident(Ident),
     /// A keyword.
     Keyword(Keyword),
     /// A literal.
     Literal(Literal),
 }
 
+impl Display for Token {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        match self {
+            &Token::Add => write!(f, "+"),
+            &Token::Sub => write!(f, "-"),
+            &Token::Assign => write!(f, "="),
+            &Token::AddAssign => write!(f, "+="),
+            &Token::SubAssign => write!(f, "-="),
+            &Token::Semi => write!(f, ";"),
+            &Token::Ident(ref ident) => write!(f, "{}", ident),
+            &Token::Keyword(ref keyword) => write!(f, "{}", keyword),
+            &Token::Literal(ref literal) => write!(f, "{}", literal),
+        }
+    }
+}
+
+/// An identifier.
+#[derive(Clone,Debug,PartialEq,Eq)]
+pub struct Ident(String);
+
+impl Display for Ident {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        write!(f, "ident({})", self.0)
+    }
+}
+
 /// A keyword.
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq,Eq)]
 pub enum Keyword {
     /// `const`
     Const,
@@ -39,11 +66,28 @@ pub enum Keyword {
     Int,
 }
 
+impl Display for Keyword {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        match *self {
+            Keyword::Const => write!(f, "const"),
+            Keyword::Int => write!(f, "int"),
+        }
+    }
+}
+
 /// A literal.
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq,Eq)]
 pub enum Literal {
     /// An integer literal.
     Int(u16),
+}
+
+impl Display for Literal {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        match *self {
+            Literal::Int(n) => write!(f, "int_lit({})", n),
+        }
+    }
 }
 
 /// Represents the state of the lexer.
@@ -52,6 +96,8 @@ pub struct Lexer<I>
 {
     input: PutBack<I>,
     line: usize,
+    /// Buffer of tokens (for use with the `put_back` method).
+    buf: Vec<Token>,
 }
 
 impl<I> Lexer<I>
@@ -64,7 +110,18 @@ impl<I> Lexer<I>
         Lexer {
             input: itertools::put_back(input),
             line: 1,
+            buf: Vec::new(),
         }
+    }
+
+    /// Returns the current line number.
+    pub fn line(&self) -> usize {
+        self.line
+    }
+
+    /// Puts the given token back into the lexer for later access.
+    pub fn put_back(&mut self, tok: Token) {
+        self.buf.push(tok);
     }
 
     /// Helper method for parsing an integer literal.
@@ -107,7 +164,7 @@ impl<I> Lexer<I>
         Ok(match word.as_str() {
                "const" => Token::Keyword(Keyword::Const),
                "int" => Token::Keyword(Keyword::Int),
-               _ => Token::Ident(word),
+               _ => Token::Ident(Ident(word)),
            })
     }
 }
@@ -118,6 +175,10 @@ impl<I> Iterator for Lexer<I>
     type Item = Result<Token>;
 
     fn next(&mut self) -> Option<Result<Token>> {
+        if let Some(tok) = self.buf.pop() {
+            return Some(Ok(tok));
+        }
+
         match self.input.next() {
             Some(Ok(b)) => {
                 Some(Ok(match b {

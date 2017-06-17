@@ -10,9 +10,17 @@ pub mod errors {
                 description("lexer error")
                 display("lexer error on line {}: {}", n, s)
             }
+
+            /// A parser error.
+            Parser(s: String, n: usize) {
+                description("parser error")
+                display("parser error on line {}: {}", n, s)
+            }
         }
     }
 }
 
+pub mod ast;
 pub mod lexer;
+pub mod parser;
 
