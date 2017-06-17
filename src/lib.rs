@@ -18,11 +18,17 @@
 
 #[macro_use]
 extern crate error_chain;
+extern crate itertools;
 
 pub mod errors {
     //! The error types for this crate, generated using `error-chain`.
+    #![allow(missing_docs)]
 
     error_chain! {
+        links {
+            Ibcmc(::ibcmc::errors::Error, ::ibcmc::errors::ErrorKind);
+        }
+
         errors {
             /// Tried to execute an instruction on a halted machine.
             Halted {
@@ -68,12 +74,13 @@ pub mod errors {
     }
 }
 
-pub use errors::*;
-
 mod asm;
 mod debug;
+pub mod ibcmc;
 mod instruction;
 mod simulator;
+
+pub use errors::*;
 
 pub use asm::Assembler;
 pub use debug::Debugger;

@@ -1,94 +1,91 @@
 extern crate clap;
+#[macro_use]
 extern crate error_chain;
 
 extern crate ibcm;
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 use std::fs::File;
-use std::io::{self, Write};
-use std::process;
+use std::io::{self, Read, Write};
 
 use clap::{Arg, App, ArgMatches, SubCommand};
 
 use ibcm::errors::*;
 use ibcm::{Assembler, Debugger, Simulator};
+use ibcm::ibcmc::lexer::Lexer;
 
-fn main() {
-    let matches = App::new("IBCM (Itty Bitty Computing Machine)")
-        .version("0.1.0")
-        .author("Ian Johnson <ianprime0509@gmail.com>")
-        .subcommand(SubCommand::with_name("compile")
-            .arg(Arg::with_name("INPUT")
-                .help("The program data file to compile")
-                .required(true))
-            .arg(Arg::with_name("binary")
-                .short("b")
-                .long("binary")
-                .help("Outputs a binary file instead of a hexadecimal listing"))
-            .arg(Arg::with_name("hex")
-                .short("x")
-                .long("hex")
-                .help("Processes the input as a hexadecimal listing"))
-            .arg(Arg::with_name("output")
-                .short("o")
-                .long("output")
-                .value_name("FILE")
-                .default_value("ibcm.out")
-                .help("Sets the output file name")
-                .takes_value(true)))
-        .subcommand(SubCommand::with_name("debug")
-            .arg(Arg::with_name("INPUT")
-                .help("The program to debug")
-                .required(true))
-            .arg(Arg::with_name("asm")
-                .conflicts_with("binary")
-                .short("s")
-                .long("asm")
-                .help("Processes the input as an ICBM assembly file"))
-            .arg(Arg::with_name("binary")
-                .short("b")
-                .long("binary")
-                .help("Processes the input as a binary file")))
-        .subcommand(SubCommand::with_name("execute")
-            .arg(Arg::with_name("INPUT")
-                .help("The program data file to load")
-                .required(true))
-            .arg(Arg::with_name("asm")
-                .conflicts_with("binary")
-                .short("s")
-                .long("asm")
-                .help("Processes the input as an ICBM assembly file"))
-            .arg(Arg::with_name("binary")
-                .short("b")
-                .long("binary")
-                .help("Processes the input as a binary file")))
-        .get_matches();
-
-    if let Err(ref e) = run(&matches) {
-        let mut stderr = io::stderr();
-        let errmsg = "Error writing to stderr";
-
-        writeln!(stderr, "error: {}", e).expect(errmsg);
-
-        for e in e.iter().skip(1) {
-            writeln!(stderr, "caused by: {}", e).expect(errmsg);
-        }
-
-        if let Some(backtrace) = e.backtrace() {
-            writeln!(stderr, "backtrace: {:?}", backtrace).expect(errmsg);
-        }
-
-        process::exit(1);
-    }
-}
+quick_main!(run);
 
 /// Program logic goes in this function (for more convenient error handling).
-fn run(m: &ArgMatches) -> Result<()> {
-    match m.subcommand() {
+fn run() -> Result<()> {
+    let matches = App::new("IBCM (Itty Bitty Computing Machine)")
+        .version(VERSION)
+        .author("Ian Johnson <ianprime0509@gmail.com>")
+        .subcommand(SubCommand::with_name("compile")
+                        .arg(Arg::with_name("INPUT")
+                                 .help("The program data file to compile")
+                                 .required(true))
+                        .arg(Arg::with_name("binary")
+                                 .short("b")
+                                 .long("binary")
+                                 .help("Outputs a binary file instead of a hexadecimal listing"))
+                        .arg(Arg::with_name("hex")
+                                 .short("x")
+                                 .long("hex")
+                                 .help("Processes the input as a hexadecimal listing"))
+                        .arg(Arg::with_name("output")
+                                 .short("o")
+                                 .long("output")
+                                 .value_name("FILE")
+                                 .default_value("ibcm.out")
+                                 .help("Sets the output file name")
+                                 .takes_value(true)))
+        .subcommand(SubCommand::with_name("debug")
+                        .arg(Arg::with_name("INPUT")
+                                 .help("The program to debug")
+                                 .required(true))
+                        .arg(Arg::with_name("asm")
+                                 .conflicts_with("binary")
+                                 .short("s")
+                                 .long("asm")
+                                 .help("Processes the input as an ICBM assembly file"))
+                        .arg(Arg::with_name("binary")
+                                 .short("b")
+                                 .long("binary")
+                                 .help("Processes the input as a binary file")))
+        .subcommand(SubCommand::with_name("execute")
+                        .arg(Arg::with_name("INPUT")
+                                 .help("The program data file to load")
+                                 .required(true))
+                        .arg(Arg::with_name("asm")
+                                 .conflicts_with("binary")
+                                 .short("s")
+                                 .long("asm")
+                                 .help("Processes the input as an ICBM assembly file"))
+                        .arg(Arg::with_name("binary")
+                                 .short("b")
+                                 .long("binary")
+                                 .help("Processes the input as a binary file")))
+        .subcommand(SubCommand::with_name("ibcmc")
+                        .arg(Arg::with_name("INPUT")
+                                 .help("The IBCMC source file to compile")
+                                 .required(true))
+                        .arg(Arg::with_name("output")
+                                 .short("o")
+                                 .long("output")
+                                 .value_name("OUTPUT")
+                                 .help("Sets the output file name")
+                                 .takes_value(true)))
+        .get_matches();
+
+    match matches.subcommand() {
         ("compile", Some(sub_m)) => compile(sub_m),
         ("debug", Some(sub_m)) => debug(sub_m),
         ("execute", Some(sub_m)) => execute(sub_m),
+        ("ibcmc", Some(sub_m)) => ibcmc(sub_m),
         _ => {
-            println!("{}", m.usage());
+            println!("{}", matches.usage());
             Ok(())
         }
     }
@@ -97,7 +94,8 @@ fn run(m: &ArgMatches) -> Result<()> {
 /// The `compile` subcommand.
 fn compile(m: &ArgMatches) -> Result<()> {
     let input = m.value_of("INPUT").unwrap();
-    let f = File::open(input).chain_err(|| ErrorKind::Io("could not open input file".into()))?;
+    let f = File::open(input)
+        .chain_err(|| ErrorKind::Io(format!("could not open input file `{}`", input)))?;
     // Read input file into a simulator (only needed for memory)
     let sim = if m.is_present("hex") {
         Simulator::from_hex(f)
@@ -108,7 +106,8 @@ fn compile(m: &ArgMatches) -> Result<()> {
     // Safe because we provided a default value
     let output = m.value_of("output").unwrap();
     let of =
-        File::create(output).chain_err(|| ErrorKind::Io("could not create output file".into()))?;
+        File::create(output)
+            .chain_err(|| ErrorKind::Io(format!("could not create output file `{}`", output)))?;
     if m.is_present("binary") {
         sim.to_binary(of)?;
     } else {
@@ -122,7 +121,8 @@ fn compile(m: &ArgMatches) -> Result<()> {
 fn debug(m: &ArgMatches) -> Result<()> {
     // We can unwrap here since INPUT is a required argument
     let input = m.value_of("INPUT").unwrap();
-    let f = File::open(input).chain_err(|| ErrorKind::Io("could not open input file".into()))?;
+    let f = File::open(input)
+        .chain_err(|| ErrorKind::Io(format!("could not open input file `{}`", input)))?;
     // Read the input file into a simulator
     let sim = if m.is_present("binary") {
         Simulator::from_binary(f)
@@ -139,7 +139,9 @@ fn debug(m: &ArgMatches) -> Result<()> {
         io::stdout().flush().expect("could not flush stdout");
 
         let mut input = String::new();
-        io::stdin().read_line(&mut input).chain_err(|| ErrorKind::Io("could not read from stdin".into()))?;
+        io::stdin()
+            .read_line(&mut input)
+            .chain_err(|| ErrorKind::Io("could not read from stdin".into()))?;
         let input_parts = input.trim().split_whitespace().collect::<Vec<_>>();
         if input_parts.is_empty() {
             continue;
@@ -169,7 +171,8 @@ fn debug(m: &ArgMatches) -> Result<()> {
 fn execute(m: &ArgMatches) -> Result<()> {
     // We can unwrap here since INPUT is a required argument
     let input = m.value_of("INPUT").unwrap();
-    let f = File::open(input).chain_err(|| ErrorKind::Io("could not open input file".into()))?;
+    let f = File::open(input)
+        .chain_err(|| ErrorKind::Io(format!("could not open input file `{}`", input)))?;
     // Read the input file into a simulator
     let mut sim = if m.is_present("binary") {
         Simulator::from_binary(f)
@@ -182,3 +185,17 @@ fn execute(m: &ArgMatches) -> Result<()> {
     // Run the simulator program
     sim.run()
 }
+
+/// The `ibcmc` subcommand.
+fn ibcmc(m: &ArgMatches) -> Result<()> {
+    let input = m.value_of("INPUT").unwrap();
+    let f = File::open(input)
+        .chain_err(|| ErrorKind::Io(format!("could not open input file `{}`", input)))?;
+
+    for tok in Lexer::new(f.bytes()) {
+        println!("{:?}", tok?);
+    }
+
+    Ok(())
+}
+
