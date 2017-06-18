@@ -3,7 +3,7 @@
 use std::io::Result as IoResult;
 
 use ibcmc::errors::*;
-use ibcmc::ast::{Type, BinOp, Block, Stmt, Expr};
+use ibcmc::ast::{Type, BinOp, Block, Stmt, Expr, Decl};
 use ibcmc::lexer::{Lexer, Token, Ident, Keyword};
 
 macro_rules! eparse {
@@ -34,8 +34,11 @@ impl<I> Parser<I>
     fn block(&mut self) -> Result<Block> {
         let mut stmts = Vec::new();
 
-        while let Some(tok) = self.lexer.next() {
-            self.lexer.put_back(tok?);
+        while let Some(tok) = self.lexer.peek() {
+            if tok? == Token::RBrace {
+                // End of the current block
+                break;
+            }
             stmts.push(self.stmt()?);
         }
 
@@ -44,82 +47,84 @@ impl<I> Parser<I>
 
     /// Parses a statement.
     ///
-    /// The semicolon at the end of the line will be parsed as a part of this node (or a helper function, like `decl_or_init_stmt`), if relevant.
+    /// The semicolon at the end of the line will be parsed as a part of this node (or a helper function, like `stmt_after_type`), if relevant.
     fn stmt(&mut self) -> Result<Stmt> {
-        Ok(match self.lexer.next().unwrap()? {
-            Token::Semi => Stmt::Empty,
-            Token::Keyword(Keyword::Const) => match self.decl_or_init_stmt()? {
-                Stmt::Decl(_, ty, ident) => Stmt::Decl(true, ty, ident),
-                Stmt::Init(_, ty, ident, expr) => Stmt::Init(true, ty, ident, expr),
-                _ => unreachable!("error in decl_or_init_stmt()")
-            },
-            tok @ Token::Keyword(Keyword::Int) => {
-                self.lexer.put_back(tok);
-                self.decl_or_init_stmt()?
-            }
-            Token::Ident(ident) => {
-                if let Some(tok) = self.lexer.next() {
-                    match tok? {
-                        Token::Assign => {
-                            let expr = self.expr()?;
-                            self.expect(Token::Semi)?;
-                            Stmt::Assign(ident, expr)
-                        }
-                        Token::AddAssign => {
-                            let expr = self.expr()?;
-                            self.expect(Token::Semi)?;
-                            Stmt::CompoundAssign(ident, BinOp::Add, expr)
-                        }
-                        Token::SubAssign => {
-                            let expr = self.expr()?;
-                            self.expect(Token::Semi)?;
-                            Stmt::CompoundAssign(ident, BinOp::Sub, expr)
-                        }
-                        tok => {
-                            self.lexer.put_back(tok);
-                            self.expect(Token::Semi)?;
-                            Stmt::Expr(self.expr()?)
-                        }
-                    }
-                } else {
-                    return Err(eparse!(self, "expected expression or assignment"));
-                }
-            }
-            tok => {
-                self.lexer.put_back(tok);
-                let res = Stmt::Expr(self.expr()?);
-                self.expect(Token::Semi)?;
-                res
-            }
-        })
-    }
-
-    /// Parses a declaration or initialization statement.
-    fn decl_or_init_stmt(&mut self) -> Result<Stmt> {
         if let Some(tok) = self.lexer.next() {
-            match tok? {
-                // Get the type
-                Token::Keyword(Keyword::Int) => {
-                    let ident = self.ident()?;
+            Ok(match tok? {
+                Token::Semi => Stmt::Empty,
+                tok @ Token::Keyword(Keyword::Const) | tok @ Token::Keyword(Keyword::Int) => {
+                    self.lexer.put_back(tok);
+                    self.stmt_after_type()?
+                }
+                Token::Ident(ident) => {
                     if let Some(tok) = self.lexer.next() {
-                       match tok? { 
-                            // Distinguish between declaration and initialization
-                            Token::Semi => Ok(Stmt::Decl(false, Type::Int, ident)),
+                        match tok? {
                             Token::Assign => {
                                 let expr = self.expr()?;
                                 self.expect(Token::Semi)?;
-                                Ok(Stmt::Init(false, Type::Int, ident, expr))
+                                Stmt::Assign(ident, expr)
                             }
-                            tok => Err(eparse!(self, "expected `;` or `=`, got `{}`", tok)),
+                            Token::AddAssign => {
+                                let expr = self.expr()?;
+                                self.expect(Token::Semi)?;
+                                Stmt::CompoundAssign(ident, BinOp::Add, expr)
+                            }
+                            Token::SubAssign => {
+                                let expr = self.expr()?;
+                                self.expect(Token::Semi)?;
+                                Stmt::CompoundAssign(ident, BinOp::Sub, expr)
+                            }
+                            tok => {
+                                self.lexer.put_back(tok);
+                                self.expect(Token::Semi)?;
+                                Stmt::Expr(self.expr()?)
+                            }
                         }
                     } else {
-                        Err(eparse!(self, "expected `;` or `=`"))
+                        return Err(eparse!(self, "expected expression or assignment"));
                     }
                 }
-                tok => Err(eparse!(self, "expected type, got `{}`", tok)),
-            }
+                Token::LBrace => {
+                    let block = self.block()?;
+                    self.expect(Token::RBrace)?;
+                    Stmt::Block(block)
+                }
+                tok => {
+                    self.lexer.put_back(tok);
+                    let res = Stmt::Expr(self.expr()?);
+                    self.expect(Token::Semi)?;
+                    res
+                }
+            })
         } else {
-            Err(eparse!(self, "expected declaration or initialization statement"))
+            Err(eparse!(self, "unexpected end of program"))
+        }
+    }
+
+    /// Parses a variable declaration, initialization, or function definition.
+    fn stmt_after_type(&mut self) -> Result<Stmt> {
+        let decl = self.decl()?;
+        if let Some(tok) = self.lexer.next() {
+            // Distinguish between declaration, initialization, and function declaration
+            Ok(match tok? { 
+                Token::Semi => Stmt::Decl(decl),
+                Token::Assign => {
+                    let expr = self.expr()?;
+                    self.expect(Token::Semi)?;
+                    Stmt::Init(decl, expr)
+                }
+                Token::LParen => {
+                    let param_list = self.param_list()?;
+                    self.expect(Token::RParen)?;
+                    self.expect(Token::LBrace)?;
+                    let body = self.block()?;
+                    self.expect(Token::RBrace)?;
+                    Stmt::Function(decl, param_list, body)
+                }
+                tok => return Err(eparse!(self, "expected `;`, `=`, or `(`, got `{}`", tok)),
+            })
+        } else {
+            Err(eparse!(self, "expected `;`, `=`, or `(`"))
         }
     }
 
@@ -144,6 +149,56 @@ impl<I> Parser<I>
             })
         } else {
             Err(eparse!(self, "expected expression"))
+        }
+    }
+
+    /// Parses a list of function parameters.
+    fn param_list(&mut self) -> Result<Vec<Decl>> {
+        let mut params = Vec::new();
+
+        while let Some(tok) = self.lexer.peek() {
+            if tok? == Token::RParen {
+                break;
+            }
+            params.push(self.decl()?);
+
+            if let Some(tok) = self.lexer.next() {
+                match tok? {
+                    Token::Comma => continue,
+                    tok => {
+                        self.lexer.put_back(tok);
+                        break;
+                    }
+                }
+            } else {
+                return Err(eparse!(self, "unexpected end of function parameter list"));
+            }
+        }
+
+        Ok(params)
+    }
+
+    /// Parses a declaration.
+    fn decl(&mut self) -> Result<Decl> {
+        if let Some(tok) = self.lexer.next() {
+            Ok(match tok? {
+                Token::Keyword(Keyword::Const) => {
+                    let mut res = self.decl()?;
+                    res.is_const = true;
+                    res
+                }
+                Token::Keyword(Keyword::Int) => {
+                    let name = self.ident()?;
+                    Decl {
+                        is_const: false,
+                        ty: Type::Int,
+                        name
+                    }
+                }
+                tok => return Err(eparse!(self, "expected type, found `{}`", tok)),
+            })
+        } else {
+            Err(eparse!(self, "expected variable declaration"))
         }
     }
 

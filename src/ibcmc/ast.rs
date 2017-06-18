@@ -7,9 +7,13 @@ use ibcmc::lexer::{Ident, Literal};
 #[derive(Clone,Debug)]
 pub struct Block(pub Vec<Stmt>);
 
-/// Represents a single statement (e.g. a line ending in a semicolon).
+/// Represents a single statement (e.g. a line ending in a semicolon, or even another block).
 #[derive(Clone,Debug)]
 pub enum Stmt {
+    /// A function declaration.
+    ///
+    /// The members are: declaration (return type and name), parameters, and the body.
+    Function(Decl, Vec<Decl>, Block),
     /// A block (e.g. delimited by `{}`).
     Block(Block),
     /// An assignment (e.g. `i = 3`).
@@ -19,9 +23,9 @@ pub enum Stmt {
     /// A declaration (e.g. `int i`).
     ///
     /// The first member specifies whether a constant is being declared.
-    Decl(bool, Type, Ident),
+    Decl(Decl),
     /// An initialization (e.g. `int i = 2`).
-    Init(bool, Type, Ident, Expr),
+    Init(Decl, Expr),
     /// An expression.
     Expr(Expr),
     /// The empty statement.
@@ -37,6 +41,17 @@ pub enum Expr {
     Ident(Ident),
     /// A literal.
     Literal(Literal),
+}
+
+/// Represents a variable declaration or function parameter.
+#[derive(Clone,Debug)]
+pub struct Decl {
+    /// Whether the variable is constant.
+    pub is_const: bool,
+    /// The type.
+    pub ty: Type,
+    /// The name.
+    pub name: Ident,
 }
 
 /// An enumeration of all possible types.

@@ -22,6 +22,16 @@ pub enum Token {
     SubAssign,
     /// `;`
     Semi,
+    /// `,`
+    Comma,
+    /// `(`
+    LParen,
+    /// `)`
+    RParen,
+    /// `{`
+    LBrace,
+    /// `}`
+    RBrace,
 
     /// An identifier.
     Ident(Ident),
@@ -40,6 +50,11 @@ impl Display for Token {
             &Token::AddAssign => write!(f, "+="),
             &Token::SubAssign => write!(f, "-="),
             &Token::Semi => write!(f, ";"),
+            &Token::Comma => write!(f, ","),
+            &Token::LParen => write!(f, "("),
+            &Token::RParen => write!(f, ")"),
+            &Token::LBrace => write!(f, "{{"),
+            &Token::RBrace => write!(f, "}}"),
             &Token::Ident(ref ident) => write!(f, "{}", ident),
             &Token::Keyword(ref keyword) => write!(f, "{}", keyword),
             &Token::Literal(ref literal) => write!(f, "{}", literal),
@@ -124,6 +139,18 @@ impl<I> Lexer<I>
         self.buf.push(tok);
     }
 
+    /// Returns the next token in the stream without consuming it.
+    pub fn peek(&mut self) -> Option<Result<Token>> {
+        match self.next() {
+            Some(Ok(tok)) => {
+                self.put_back(tok.clone());
+                Some(Ok(tok))
+            }
+            Some(Err(e)) => Some(Err(e)),
+            None => None,
+        }
+    }
+
     /// Helper method for parsing an integer literal.
     fn parse_int_lit(&mut self) -> Result<Token> {
         let mut int = 0;
@@ -204,6 +231,11 @@ impl<I> Iterator for Lexer<I>
                             }
                             b'=' => Token::Assign,
                             b';' => Token::Semi,
+                            b',' => Token::Comma,
+                            b'(' => Token::LParen,
+                            b')' => Token::RParen,
+                            b'{' => Token::LBrace,
+                            b'}' => Token::RBrace,
                             b'0'...b'9' => {
                                 self.input.put_back(Ok(b));
                                 return Some(self.parse_int_lit());
