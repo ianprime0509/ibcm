@@ -64,7 +64,7 @@ impl Display for Token {
 
 /// An identifier.
 #[derive(Clone,Debug,PartialEq,Eq)]
-pub struct Ident(String);
+pub struct Ident(pub String);
 
 impl Display for Ident {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
@@ -79,6 +79,8 @@ pub enum Keyword {
     Const,
     /// `int`
     Int,
+    /// `void`
+    Void,
 }
 
 impl Display for Keyword {
@@ -86,6 +88,7 @@ impl Display for Keyword {
         match *self {
             Keyword::Const => write!(f, "const"),
             Keyword::Int => write!(f, "int"),
+            Keyword::Void => write!(f, "void"),
         }
     }
 }
@@ -118,7 +121,7 @@ pub struct Lexer<I>
 impl<I> Lexer<I>
     where I: Iterator<Item = IoResult<u8>>
 {
-    /// Creates a new lexer from the given input.
+    /// Creates a new lexer from the given input iterator.
     pub fn new<J>(input: J) -> Lexer<I>
         where J: IntoIterator<Item = IoResult<u8>, IntoIter = I>
     {
@@ -179,7 +182,8 @@ impl<I> Lexer<I>
                                     ErrorKind::Lexer("could not read lexer input".into(), self.line)
                                 })? {
                 letter @ b'A'...b'Z' |
-                letter @ b'a'...b'z' => word.push(letter as char),
+                letter @ b'a'...b'z' |
+                letter @ b'0'...b'9' => word.push(letter as char),
                 other => {
                     self.input.put_back(Ok(other));
                     break;
@@ -191,6 +195,7 @@ impl<I> Lexer<I>
         Ok(match word.as_str() {
                "const" => Token::Keyword(Keyword::Const),
                "int" => Token::Keyword(Keyword::Int),
+               "void" => Token::Keyword(Keyword::Void),
                _ => Token::Ident(Ident(word)),
            })
     }

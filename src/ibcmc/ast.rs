@@ -4,11 +4,11 @@ use ibcmc::lexer::{Ident, Literal};
 
 /// Represents a single block (e.g. the definition of a function, or a block delimited by `{}`).
 /// A block is merely a vector of statements.
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq,Eq)]
 pub struct Block(pub Vec<Stmt>);
 
 /// Represents a single statement (e.g. a line ending in a semicolon, or even another block).
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq,Eq)]
 pub enum Stmt {
     /// A function declaration.
     ///
@@ -33,7 +33,7 @@ pub enum Stmt {
 }
 
 /// Represents a single expression (e.g. `i + 3`).
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq,Eq)]
 pub enum Expr {
     /// A binary operation (e.g. `i + 3`).
     BinOp(BinOp, Box<Expr>, Box<Expr>),
@@ -44,7 +44,7 @@ pub enum Expr {
 }
 
 /// Represents a variable declaration or function parameter.
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq,Eq)]
 pub struct Decl {
     /// Whether the variable is constant.
     pub is_const: bool,
@@ -55,14 +55,14 @@ pub struct Decl {
 }
 
 /// An enumeration of all possible types.
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq,Eq)]
 pub enum Type {
     /// An integer (`u16`).
     Int,
 }
 
 /// All the binary operations which can be performed on a variable.
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq,Eq)]
 pub enum BinOp {
     /// Addition.
     Add,
