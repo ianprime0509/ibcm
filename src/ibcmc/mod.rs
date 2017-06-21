@@ -47,7 +47,7 @@ mod tests {
 
     #[test]
     fn tokens() {
-        // Check to make sure the lexer can parse all tokens correctly
+        // Check to make sure the lexer can parse tokens correctly
         let tokens = b"const int i = 3;
         void function(int p1, int p2) {
             local += 5 + 2;
@@ -88,20 +88,42 @@ mod tests {
     }
 
     #[test]
+    fn stmt_line() {
+        // Check whether line numbers are recorded correctly.
+        let prog = b";
+        ;
+
+
+        ;;;";
+        let parsed = parse(prog);
+
+        assert_eq!(parsed,
+                   Block(vec![Stmt::Empty.with_line(1),
+                              Stmt::Empty.with_line(2),
+                              Stmt::Empty.with_line(5),
+                              Stmt::Empty.with_line(5),
+                              Stmt::Empty.with_line(5)]));
+    }
+
+    #[test]
     fn assignment() {
+        // Check parsing assignment statements.
         let prog = b"i = 2;
         j += 3;
         k -= 4;";
         let parsed = parse(prog);
 
         assert_eq!(parsed,
-                   Block(vec![Stmt::Assign(Ident("i".into()), Expr::Literal(Literal::Int(2))),
+                   Block(vec![Stmt::Assign(Ident("i".into()), Expr::Literal(Literal::Int(2)))
+                                  .with_line(1),
                               Stmt::CompoundAssign(Ident("j".into()),
                                                    BinOp::Add,
-                                                   Expr::Literal(Literal::Int(3))),
+                                                   Expr::Literal(Literal::Int(3)))
+                                  .with_line(2),
                               Stmt::CompoundAssign(Ident("k".into()),
                                                    BinOp::Sub,
-                                                   Expr::Literal(Literal::Int(4)))]));
+                                                   Expr::Literal(Literal::Int(4)))
+                                  .with_line(3)]));
     }
 }
 

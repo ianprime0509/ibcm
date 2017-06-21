@@ -3,7 +3,7 @@
 use std::io::Result as IoResult;
 
 use ibcmc::errors::*;
-use ibcmc::ast::{Type, BinOp, Block, Stmt, Expr, Decl};
+use ibcmc::ast::{Type, BinOp, Block, Stmt, Expr, Decl, StmtLine};
 use ibcmc::lexer::{Lexer, Token, Ident, Keyword};
 
 macro_rules! eparse {
@@ -48,9 +48,10 @@ impl<I> Parser<I>
     /// Parses a statement.
     ///
     /// The semicolon at the end of the line will be parsed as a part of this node (or a helper function, like `stmt_after_type`), if relevant.
-    fn stmt(&mut self) -> Result<Stmt> {
+    fn stmt(&mut self) -> Result<StmtLine> {
         if let Some(tok) = self.lexer.next() {
-            Ok(match tok? {
+            let line = self.lexer.line();
+            let stmt = match tok? {
                 Token::Semi => Stmt::Empty,
                 tok @ Token::Keyword(Keyword::Const) | tok @ Token::Keyword(Keyword::Int) => {
                     self.lexer.put_back(tok);
@@ -95,7 +96,8 @@ impl<I> Parser<I>
                     self.expect(Token::Semi)?;
                     res
                 }
-            })
+            };
+            Ok(stmt.with_line(line))
         } else {
             Err(eparse!(self, "unexpected end of program"))
         }
